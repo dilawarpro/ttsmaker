@@ -85,6 +85,7 @@
                                 Select Language
                             </label>
                             <select class="form-select" id="languageSelect">
+                                <option value="en-US">English</option>
                                 <option value="hi-IN">Hindi</option>
                                 <option value="ur-IN">Urdu</option>
                             </select>
@@ -133,41 +134,7 @@
     <script>
         class TextToSpeech {
             constructor() {
-                this.voices = {
-                    "9c8ab827-6b6e-45ae-936c-f41ede490ead": {
-                        id: "9c8ab827-6b6e-45ae-936c-f41ede490ead",
-                        name: "Sales",
-                        preview_path: {
-                            "hi-IN": "https://prod-ai-projects.s3.ap-south-1.amazonaws.com/desi-vocal/bf13a806-58e9-4ba7-ba8a-e14b941aa96e.mp3"
-                        },
-                        languages: ["hi-IN"]
-                    },
-                    "25548131-6fcd-4aa1-9112-0601ea9cde9e": {
-                        id: "25548131-6fcd-4aa1-9112-0601ea9cde9e",
-                        name: "Sales Impact Lite",
-                        preview_path: {
-                            "hi-IN": "https://desivocal-stage.s3.ap-south-1.amazonaws.com/desi-vocal/80aeab18-36a4-433a-b4bd-014214f75d88.mp3"
-                        },
-                        languages: ["hi-IN"]
-                    },
-                    "c626bac6-eafa-4d85-acbb-4d714b31cfb3": {
-                        id: "c626bac6-eafa-4d85-acbb-4d714b31cfb3",
-                        name: "Gul",
-                        preview_path: {
-                            "ur-IN": "https://desivocal-stage.s3.ap-south-1.amazonaws.com/desi-vocal/847d3cf7-bc94-4ce5-9962-2ab08c2774db.mp3"
-                        },
-                        languages: ["ur-IN"]
-                    },
-                    "bed559be-c4c8-4a55-8b00-2528971c48b2": {
-                        id: "bed559be-c4c8-4a55-8b00-2528971c48b2",
-                        name: "Salman",
-                        preview_path: {
-                            "ur-IN": "https://desivocal-stage.s3.ap-south-1.amazonaws.com/desi-vocal/9e59402a-ad7e-4ca2-85af-5009c50547aa.mp3"
-                        },
-                        languages: ["ur-IN"]
-                    }
-                };
-
+                this.voices = [];
                 this.elements = {
                     languageSelect: document.getElementById('languageSelect'),
                     voiceSelect: document.getElementById('voiceSelect'),
@@ -182,49 +149,67 @@
             }
 
             init() {
+                // Populate voices when available
+                this.populateVoices();
+                
                 this.elements.languageSelect.addEventListener('change', () => this.updateVoices());
                 this.elements.previewButton.addEventListener('click', () => this.previewVoice());
                 this.elements.speakButton.addEventListener('click', () => this.convertToSpeech());
-                this.updateVoices();
             }
 
-            updateVoices() {
+            populateVoices() {
+                const voices = speechSynthesis.getVoices();
+                this.voices = voices;
                 const selectedLang = this.elements.languageSelect.value;
                 this.elements.voiceSelect.innerHTML = '';
 
-                Object.values(this.voices).forEach(voice => {
-                    if (voice.languages && voice.languages.includes(selectedLang)) {
-                        const option = new Option(voice.name, voice.id);
+                voices.forEach(voice => {
+                    if (voice.lang === selectedLang) {
+                        const option = new Option(voice.name, voice.name);
                         this.elements.voiceSelect.add(option);
                     }
                 });
+
+                // Ensure voices are loaded in the browser
+                if (voices.length === 0) {
+                    speechSynthesis.onvoiceschanged = () => {
+                        this.populateVoices();
+                    };
+                }
+            }
+
+            updateVoices() {
+                this.populateVoices();
             }
 
             previewVoice() {
-                const selectedVoice = this.voices[this.elements.voiceSelect.value];
+                const selectedVoice = this.elements.voiceSelect.value;
                 const selectedLang = this.elements.languageSelect.value;
-                
-                if (selectedVoice && selectedVoice.preview_path[selectedLang]) {
-                    this.elements.audioPlayer.src = selectedVoice.preview_path[selectedLang];
-                    this.elements.audioPlayer.play();
-                }
+
+                if (!selectedVoice) return;
+
+                const utterance = new SpeechSynthesisUtterance("Preview text");
+                utterance.voice = this.voices.find(voice => voice.name === selectedVoice);
+                utterance.lang = selectedLang;
+                speechSynthesis.speak(utterance);
             }
 
             async convertToSpeech() {
                 const text = this.elements.textInput.value;
-                const voiceId = this.elements.voiceSelect.value;
+                const voiceName = this.elements.voiceSelect.value;
                 
-                if (!text || !voiceId) {
+                if (!text || !voiceName) {
                     alert('Please enter text and select a voice');
                     return;
                 }
 
                 this.elements.loading.classList.add('active');
-                
+
                 try {
-                    // Here you would make the API call
-                    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulated delay
-                    this.previewVoice();
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.voice = this.voices.find(voice => voice.name === voiceName);
+                    utterance.lang = this.elements.languageSelect.value;
+                    speechSynthesis.speak(utterance);
                 } finally {
                     this.elements.loading.classList.remove('active');
                 }
